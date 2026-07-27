@@ -1,1 +1,41 @@
-
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sumo Arenası</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background-color: #0f172a; 
+            overflow: hidden; /* Kaydırma çubuklarını gizler */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            background-color: #1e293b;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .geri-don {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 15px;
+            background-color: #334155;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-family: sans-serif;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <a href="../index.html" class="geri-don">⬅ Menüye Dön</a>
+    <canvas id="gameCanvas"></canvas>
+    
+    <script src="sumo.js"></script>
+</body>
+</html>
