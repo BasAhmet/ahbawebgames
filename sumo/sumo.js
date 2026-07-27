@@ -27,10 +27,14 @@ const roomInfoDisplay = document.getElementById('roomInfoDisplay');
 const overlay = document.getElementById('gameOverlay');
 const winnerText = document.getElementById('winnerText');
 
+// SİSTEMİ SABİTLEDİK (Responsive değil, Logical)
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 600;
+
 const arena = {
-    x: canvas.width / 2, y: canvas.height / 2,
-    radius: Math.min(canvas.width, canvas.height) * 0.4,
-    color: '#334155', borderColor: '#38bdf8'
+    x: GAME_WIDTH / 2, 
+    y: GAME_HEIGHT / 2,
+    radius: 200 // Sabit arena boyutu
 };
 
 let players = [];
@@ -126,12 +130,14 @@ document.getElementById('btnJoin').onclick = () => {
                     document.getElementById('waitingCode').innerText = "KOD: " + roomCode;
                     document.getElementById('waitingCount').innerText = "Bağlanıldı, Kurucu Bekleniyor...";
                     
-                    onValue(ref(db, 'rooms/' + roomCode + '/info/ready'), (snap) => {
-                        if (snap.exists() && snap.val() === true && !gameStarted) {
-                            waitingScreen.style.display = 'none';
-                            roomInfoDisplay.innerText = "Oda: " + roomCode;
-                            roomInfoDisplay.style.display = 'block';
-                            gameStarted = true;
+                    onValue(ref(db, 'rooms/' + roomCode + '/state'), (snap) => {
+                        if (snap.exists()) {
+                            let data = snap.val();
+                            players = (Array.isArray(data) ? data : Object.values(data));
+                            if (!gameStarted) {
+                                gameStarted = true;
+                                gameLoop(); // Döngüyü buradan tetikliyoruz
+                            }
                         }
                     });
 
@@ -191,7 +197,7 @@ function resolveCollision(p1, p2) {
 }
 
 function update() {
-    if (!gameStarted) return;
+    if (!gameStarted || gameOver) return;
 
     let alivePlayers = players.filter(p => !p.isDead);
 
@@ -254,7 +260,9 @@ function update() {
 
             p.vx *= p.friction; p.vy *= p.friction;
             p.x += p.vx; p.y += p.vy;
-            if (Math.hypot(p.x - arena.x, p.y - arena.y) > arena.radius && !p.isDead) p.isDead = true;
+            if (Math.hypot(p.x - arena.x, p.y - arena.y) > arena.radius && !p.isDead) {
+            p.isDead = true;
+        }
         });
 
         for (let i = 0; i < players.length; i++) {
@@ -283,7 +291,7 @@ function update() {
 
 function draw() {
     if(!gameStarted) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     ctx.beginPath(); ctx.arc(arena.x, arena.y, arena.radius, 0, Math.PI * 2);
     ctx.fillStyle = arena.color; ctx.fill();
