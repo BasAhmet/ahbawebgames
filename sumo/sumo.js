@@ -50,7 +50,7 @@ let remoteInputs = { 2: {x:0, y:0}, 3: {x:0, y:0}, 4: {x:0, y:0} };
 let lastHostWrite = 0;
 let lastClientWrite = 0;
 let lastSentJoystick = { x: 0, y: 0 };
-const SYNC_RATE = 35; 
+const SYNC_RATE = 50; 
 
 const keys = {};
 window.addEventListener('keydown', (e) => keys[e.key] = true);
@@ -59,9 +59,28 @@ window.addEventListener('keyup', (e) => keys[e.key] = false);
 let joystickData = { x: 0, y: 0 };
 const manager = nipplejs.create({
     zone: document.getElementById('joystick-zone'),
-    mode: 'dynamic', color: '#38bdf8', size: 150
+    mode: 'dynamic', 
+    color: '#38bdf8', 
+    size: 150
 });
-manager.on('move', (evt, data) => { if (data.vector) joystickData = { x: data.vector.x, y: -data.vector.y }; });
+manager.on('move', (evt, data) => { 
+    if (data && data.vector) {
+        // Ölü bölge kontrolü: Parmak çok az kaydıysa hareketi alma (Hassasiyeti düşürür)
+        if (data.distance < 12) {
+            joystickData = { x: 0, y: 0 };
+            return;
+        } 
+        // Kuvveti daha kontrollü ve doğrusal yapıyoruz
+        let maxDist = 50; 
+        let force = Math.min(data.distance / maxDist, 1);
+        let angle = data.angle.radian;
+
+        joystickData = { 
+            x: Math.cos(angle) * force, 
+            y: -Math.sin(angle) * force 
+        };
+    }
+});
 manager.on('end', () => { joystickData = { x: 0, y: 0 }; });
 
 // === MENÜ VE LOBİ YÖNETİMİ ===
@@ -232,10 +251,12 @@ function update() {
                     if (keys['ArrowDown'] || keys['s']) p.vy += p.speed;
                     if (keys['ArrowLeft'] || keys['a']) p.vx -= p.speed;
                     if (keys['ArrowRight'] || keys['d']) p.vx += p.speed;
-                    p.vx += joystickData.x * 0.8; p.vy += joystickData.y * 0.8;
+                    p.vx += joystickData.x * (p.speed * 0.6); 
+                    p.vy += joystickData.y * (p.speed * 0.6);
                 } else {
                     if (remoteInputs[p.id]) {
-                        p.vx += remoteInputs[p.id].x * 0.8; p.vy += remoteInputs[p.id].y * 0.8;
+                        p.vx += remoteInputs[p.id].x * (p.speed * 0.6); 
+                        p.vy += remoteInputs[p.id].y * (p.speed * 0.6);
                     }
                 }
             } else {
@@ -263,8 +284,19 @@ function update() {
             }
         }
 
+        // TEPKİME İYİLEŞTİRMESİ: Firebase'e giden paket boyutunu küçültüyoruz
         if (maxPlayers > 1 && (now - lastHostWrite > SYNC_RATE)) {
-            set(ref(db, 'rooms/' + roomCode + '/state'), players);
+            let optimizedState = players.map(p => ({
+                id: p.id,
+                name: p.name,
+                x: Math.round(p.x * 10) / 10, // Küsüratlar yuvarlandı
+                y: Math.round(p.y * 10) / 10,
+                radius: p.radius,
+                color: p.color,
+                emoji: p.emoji,
+                isDead: p.isDead
+            }));
+            set(ref(db, 'rooms/' + roomCode + '/state'), optimizedState);
             lastHostWrite = now;
         }
 
@@ -279,7 +311,10 @@ function update() {
         if (keys['ArrowDown'] || keys['s']) clientInputY += 1;
         if (now - lastClientWrite > SYNC_RATE) {
             if (lastSentJoystick.x !== clientInputX || lastSentJoystick.y !== clientInputY) {
-                set(ref(db, 'rooms/' + roomCode + '/inputs/' + myId), { x: clientInputX, y: clientInputY });
+                set(ref(db, 'rooms/' + roomCode + '/inputs/' + myId), { 
+                    x: Math.round(clientInputX * 100) / 100, 
+                    y: Math.round(clientInputY * 100) / 100 
+                });
                 lastSentJoystick = { x: clientInputX, y: clientInputY };
                 lastClientWrite = now;
             }
