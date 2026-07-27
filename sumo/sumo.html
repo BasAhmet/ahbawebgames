@@ -28,16 +28,24 @@
             z-index: 5; 
         }
         .geri-don {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            padding: 10px 15px;
-            background-color: #334155;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-family: sans-serif;
-            font-weight: bold;
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        padding: 10px 15px;
+        background-color: #334155;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 0.9rem;
+        cursor: pointer;
+        z-index: 999; /* En üst katmanda tutuyoruz */
+        pointer-events: auto;
+        transition: background-color 0.2s;
+        }
+        
+        .geri-don:hover {
+            background-color: #475569;
         }
         /* Oyun Bitti Arayüzü */
         #gameOverlay {
@@ -72,7 +80,7 @@
 <body>
     <!-- Sanal Joystick Alanı -->
     <div id="joystick-zone"></div>
-    <a href="../index.html" class="geri-don">⬅ Menüye Dön</a>
+    <button class="geri-don" onclick="window.location.href='../index.html'">⬅ Menüye Dön</button>
     <!-- Oyun Sonu Ekranı -->
     <div id="gameOverlay">
         <h2 id="winnerText">Oyun Bitti</h2>
