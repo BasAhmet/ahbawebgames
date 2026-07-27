@@ -17,8 +17,10 @@ const db = getDatabase(app);
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+
+// SANAL ÇÖZÜNÜRLÜK (Her cihazda dünya boyutları sabittir)
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 600;
 
 const mpMenu = document.getElementById('mpMenu');
 const hostSetup = document.getElementById('hostSetup');
@@ -27,10 +29,13 @@ const roomInfoDisplay = document.getElementById('roomInfoDisplay');
 const overlay = document.getElementById('gameOverlay');
 const winnerText = document.getElementById('winnerText');
 
+// Arena her zaman 800x600 merkeze yerleşir
 const arena = {
-    x: canvas.width / 2, y: canvas.height / 2,
-    radius: Math.min(canvas.width, canvas.height) * 0.4,
-    color: '#334155', borderColor: '#38bdf8'
+    x: GAME_WIDTH / 2, 
+    y: GAME_HEIGHT / 2,
+    radius: 220,
+    color: '#334155', 
+    borderColor: '#38bdf8'
 };
 
 let players = [];
@@ -42,11 +47,10 @@ let gameStarted = false;
 let gameOver = false;
 let remoteInputs = { 2: {x:0, y:0}, 3: {x:0, y:0}, 4: {x:0, y:0} };
 
-// AĞ GECİKMESİNİ (LAG) ÖNLEYEN DEĞİŞKENLER
 let lastHostWrite = 0;
 let lastClientWrite = 0;
 let lastSentJoystick = { x: 0, y: 0 };
-const SYNC_RATE = 35; // Milisaniye cinsinden veri yollama aralığı (Düşük = hızlı ama tıkanabilir)
+const SYNC_RATE = 35; 
 
 const keys = {};
 window.addEventListener('keydown', (e) => keys[e.key] = true);
@@ -127,7 +131,7 @@ document.getElementById('btnJoin').onclick = () => {
                     document.getElementById('waitingCount').innerText = "Bağlanıldı, Kurucu Bekleniyor...";
                     
                     onValue(ref(db, 'rooms/' + roomCode + '/info/ready'), (snap) => {
-                        if (snap.exists() && snap.val() === true && !gameStarted) {
+                        if (snap.exists() && snap.val() === true) {
                             waitingScreen.style.display = 'none';
                             roomInfoDisplay.innerText = "Oda: " + roomCode;
                             roomInfoDisplay.style.display = 'block';
@@ -135,7 +139,7 @@ document.getElementById('btnJoin').onclick = () => {
                         }
                     });
 
-                    // GÜVENLİ VE KESİNTİSİZ ÇİZİM İÇİN DİZİ KONTROLÜ
+                    // BİLGİSAYARDAN/TELEFONDAN KATILANDA SİYAH EKRAN OLMAMASI İÇİN CANLI VERİ OKUMA
                     onValue(ref(db, 'rooms/' + roomCode + '/state'), (snap) => {
                         if (snap.exists()) {
                             let data = snap.val();
@@ -151,7 +155,6 @@ document.getElementById('btnJoin').onclick = () => {
     } else { alert("Lütfen 4 haneli kodu girin."); }
 };
 
-// YENİDEN BAŞLATMA BUTONU (Sadece Kurucu tetikler)
 document.getElementById('btnRestartRound').onclick = () => {
     if (role === 'host') {
         initPlayersSetup(maxPlayers);
@@ -161,7 +164,7 @@ document.getElementById('btnRestartRound').onclick = () => {
     }
 };
 
-// === KARAKTER KURULUMU ===
+// === KARAKTER KURULUMU (800x600 MERKEZLİ) ===
 function initPlayersSetup(playerCount) {
     players = [];
     players.push({ id: 1, name: '1. Oyuncu', x: arena.x, y: arena.y - 100, radius: 25, color: '#0ea5e9', emoji: '😎', vx: 0, vy: 0, speed: 0.6, friction: 0.95, isBot: false, isDead: false });
@@ -177,7 +180,6 @@ function initPlayersSetup(playerCount) {
     }
 }
 
-// === FİZİK VE OYUN DÖNGÜSÜ ===
 function resolveCollision(p1, p2) {
     let dx = p2.x - p1.x; let dy = p2.y - p1.y;
     let distance = Math.hypot(dx, dy); let minDist = p1.radius + p2.radius;
@@ -195,7 +197,6 @@ function update() {
 
     let alivePlayers = players.filter(p => !p.isDead);
 
-    // KAZANAN KONTROLÜ & OTOMATİK TEKRAR BAŞLAMA SENKRONİZASYONU
     if (alivePlayers.length <= 1) {
         if (!gameOver) {
             gameOver = true;
@@ -212,7 +213,6 @@ function update() {
             }
         }
     } else {
-        // Kurucu oyunu yeniden başlattıysa diğer oyuncular otomatik ekranı kapatır
         if (gameOver) {
             gameOver = false;
             overlay.style.display = 'none';
@@ -263,14 +263,12 @@ function update() {
             }
         }
 
-        // AĞ DARBOĞAZINI ÖNLEME: Host veriyi 60 FPS yerine kontrollü yollar
         if (maxPlayers > 1 && (now - lastHostWrite > SYNC_RATE)) {
             set(ref(db, 'rooms/' + roomCode + '/state'), players);
             lastHostWrite = now;
         }
 
     } else if (role === 'client') {
-        // AĞ DARBOĞAZINI ÖNLEME: Client sadece joystikte "değişim" olduğunda veri yollar
         if (now - lastClientWrite > SYNC_RATE) {
             if (lastSentJoystick.x !== joystickData.x || lastSentJoystick.y !== joystickData.y) {
                 set(ref(db, 'rooms/' + roomCode + '/inputs/' + myId), joystickData);
@@ -282,31 +280,35 @@ function update() {
 }
 
 function draw() {
-    if(!gameStarted) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    ctx.beginPath(); ctx.arc(arena.x, arena.y, arena.radius, 0, Math.PI * 2);
+    // Arena Çizimi
+    ctx.beginPath(); 
+    ctx.arc(arena.x, arena.y, arena.radius, 0, Math.PI * 2);
     ctx.fillStyle = arena.color; ctx.fill();
     ctx.lineWidth = 5; ctx.strokeStyle = arena.borderColor; ctx.stroke();
 
-    players.forEach(p => {
-        if (!p.isDead) {
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = p.color; ctx.fill();
-            ctx.lineWidth = 3; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+    // Oyuncular Oyun Başladıysa Çizilir
+    if (gameStarted) {
+        players.forEach(p => {
+            if (!p.isDead) {
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color; ctx.fill();
+                ctx.lineWidth = 3; ctx.strokeStyle = '#ffffff'; ctx.stroke();
 
-            ctx.fillStyle = '#ffffff'; ctx.font = '24px sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(p.emoji, p.x, p.y);
-        }
-    });
+                ctx.fillStyle = '#ffffff'; ctx.font = '24px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(p.emoji, p.x, p.y);
+            }
+        });
+    }
 }
 
-// SİYAH EKRAN ÇÖZÜMÜ: Döngü en başından itibaren sürekli aktiftir.
+// OYUN DÖNGÜSÜ KESİNTİSİZ ÇALIŞIR
 function gameLoop() {
-    requestAnimationFrame(gameLoop);
     update();
     draw();
+    requestAnimationFrame(gameLoop);
 }
 
 gameLoop();
