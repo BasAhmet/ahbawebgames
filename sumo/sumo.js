@@ -1,8 +1,8 @@
-// Firebase SDK'larını içe aktarıyoruz
+// Firebase SDK'ları (get fonksiyonu eklendi)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+import { getDatabase, ref, set, onValue, onDisconnect, get } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
 
-// Senin Firebase Konfigürasyonun
+// Firebase Konfigürasyonun
 const firebaseConfig = {
     apiKey: "AIzaSyA_gMfUNO-Qer_3hbsqejbUqOg-8mLU00g",
     authDomain: "ahbawebgames.firebaseapp.com",
@@ -14,14 +14,8 @@ const firebaseConfig = {
     measurementId: "G-73PHENDJPL"
 };
 
-// Firebase'i Başlat
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
-// Oyun ve Ağ Değişkenleri
-let role = null; // 'host' veya 'client'
-let roomCode = "";
-let p2RemoteInput = { x: 0, y: 0 }; // 2. Oyuncunun (Client) telefondan gelen joystick verisi
 
 // HTML Elemanları
 const canvas = document.getElementById('gameCanvas');
@@ -30,28 +24,27 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 const mpMenu = document.getElementById('mpMenu');
+const hostSetup = document.getElementById('hostSetup');
+const waitingScreen = document.getElementById('waitingScreen');
 const roomInfoDisplay = document.getElementById('roomInfoDisplay');
 const overlay = document.getElementById('gameOverlay');
 const winnerText = document.getElementById('winnerText');
 
-// Arena
+// Oyun Değişkenleri
 const arena = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
+    x: canvas.width / 2, y: canvas.height / 2,
     radius: Math.min(canvas.width, canvas.height) * 0.4,
-    color: '#334155',
-    borderColor: '#38bdf8'
+    color: '#334155', borderColor: '#38bdf8'
 };
 
-// Oyuncular (Host hesaplar, Client sadece kopyalar)
-let players = [
-    { id: 1, name: '1. Oyuncu (Host)', x: arena.x, y: arena.y - 100, radius: 25, color: '#0ea5e9', emoji: '😎', vx: 0, vy: 0, speed: 0.6, friction: 0.95, isBot: false, isDead: false },
-    { id: 2, name: '2. Oyuncu (Client)', x: arena.x, y: arena.y + 100, radius: 25, color: '#ef4444', emoji: '😈', vx: 0, vy: 0, speed: 0.6, friction: 0.95, isBot: true, isDead: false }, // Birisi katılana kadar kırmızı karakter bot olarak davranır
-    { id: 3, name: 'Yeşil Bot', x: arena.x - 150, y: arena.y, radius: 25, color: '#10b981', emoji: '🤖', vx: 0, vy: 0, speed: 0.25, friction: 0.95, isBot: true, isDead: false },
-    { id: 4, name: 'Sarı Bot', x: arena.x + 150, y: arena.y, radius: 25, color: '#f59e0b', emoji: '🤖', vx: 0, vy: 0, speed: 0.2, friction: 0.95, isBot: true, isDead: false }
-];
-
+let players = [];
+let role = null; // 'host' veya 'client'
+let roomCode = "";
+let myId = 1; 
+let maxPlayers = 1;
+let gameStarted = false;
 let gameOver = false;
+let remoteInputs = { 2: {x:0, y:0}, 3: {x:0, y:0}, 4: {x:0, y:0} };
 
 // Kontroller
 const keys = {};
@@ -61,206 +54,248 @@ window.addEventListener('keyup', (e) => keys[e.key] = false);
 let joystickData = { x: 0, y: 0 };
 const manager = nipplejs.create({
     zone: document.getElementById('joystick-zone'),
-    mode: 'dynamic',
-    color: '#38bdf8',
-    size: 150
+    mode: 'dynamic', color: '#38bdf8', size: 150
 });
-manager.on('move', (evt, data) => {
-    if (data.vector) { joystickData = { x: data.vector.x, y: -data.vector.y }; }
-});
+manager.on('move', (evt, data) => { if (data.vector) joystickData = { x: data.vector.x, y: -data.vector.y }; });
 manager.on('end', () => { joystickData = { x: 0, y: 0 }; });
 
-// === MULTIPLAYER BAĞLANTI MANTIĞI ===
+// === MULTIPLAYER MENÜ YÖNETİMİ ===
 
-// 1. Oda Kurma (Host)
-document.getElementById('btnHost').onclick = () => {
-    roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-    role = 'host';
+// 1. Oda Kurma Menüsüne Geçiş
+document.getElementById('btnHostInit').onclick = () => {
     mpMenu.style.display = 'none';
-    roomInfoDisplay.innerText = "Oda Kodu: " + roomCode;
-    roomInfoDisplay.style.display = 'block';
-
-    const roomRef = ref(db, 'rooms/' + roomCode);
-    
-    // Odayı Veritabanında oluştur ve tarayıcı kapanırsa odayı sil
-    set(roomRef, { state: players, p2Input: { x: 0, y: 0 } });
-    onDisconnect(roomRef).remove();
-
-    // 2. Oyuncunun (Client) joystick verilerini dinle
-    onValue(ref(db, 'rooms/' + roomCode + '/p2Input'), (snapshot) => {
-        if (snapshot.exists()) {
-            p2RemoteInput = snapshot.val();
-            players[1].isBot = false; // Birisi bağlandığında Kırmızı karakter bot olmaktan çıkar
-        }
-    });
-
-    gameLoop();
+    hostSetup.style.display = 'flex';
 };
 
-// 2. Odaya Katılma (Client)
+document.getElementById('btnCancelHost').onclick = () => {
+    hostSetup.style.display = 'none';
+    mpMenu.style.display = 'flex';
+};
+
+// 2. Kişi Sayısını Seçip Odayı Oluşturma (Host)
+document.querySelectorAll('.btn-player-count').forEach(btn => {
+    btn.onclick = () => {
+        maxPlayers = parseInt(btn.getAttribute('data-count'));
+        hostSetup.style.display = 'none';
+        role = 'host';
+        myId = 1;
+
+        if (maxPlayers === 1) {
+            // Tek oyunculu (Botlarla) beklemeden başlat
+            initPlayersSetup(1);
+            gameStarted = true;
+            gameLoop();
+        } else {
+            // Çok oyunculu (Lobi bekleme sistemi)
+            roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+            roomInfoDisplay.innerText = "Oda: " + roomCode;
+            roomInfoDisplay.style.display = 'block';
+            
+            waitingScreen.style.display = 'flex';
+            document.getElementById('waitingCode').innerText = "KOD: " + roomCode;
+            document.getElementById('waitingCount').innerText = `1 / ${maxPlayers}`;
+
+            const roomRef = ref(db, 'rooms/' + roomCode);
+            set(roomRef, {
+                info: { max: maxPlayers, joined: 1, ready: false },
+                inputs: { 2: {x:0, y:0}, 3: {x:0, y:0}, 4: {x:0, y:0} },
+                state: []
+            });
+            onDisconnect(roomRef).remove();
+
+            // Katılanları dinle
+            onValue(ref(db, 'rooms/' + roomCode + '/info/joined'), (snapshot) => {
+                if(snapshot.exists()) {
+                    let joined = snapshot.val();
+                    document.getElementById('waitingCount').innerText = `${joined} / ${maxPlayers}`;
+                    
+                    if (joined === maxPlayers && !gameStarted) {
+                        // Oda doldu, oyunu başlat
+                        set(ref(db, 'rooms/' + roomCode + '/info/ready'), true);
+                        waitingScreen.style.display = 'none';
+                        initPlayersSetup(maxPlayers);
+                        gameStarted = true;
+                        gameLoop();
+                    }
+                }
+            });
+
+            // Diğer oyuncuların joystick verilerini dinle
+            onValue(ref(db, 'rooms/' + roomCode + '/inputs'), (snapshot) => {
+                if(snapshot.exists() && gameStarted) {
+                    remoteInputs = snapshot.val();
+                }
+            });
+        }
+    };
+});
+
+// 3. Odaya Katılma (Client)
 document.getElementById('btnJoin').onclick = () => {
     const code = document.getElementById('joinCodeInput').value.toUpperCase();
     if (code.length === 4) {
-        roomCode = code;
-        role = 'client';
-        mpMenu.style.display = 'none';
-        roomInfoDisplay.innerText = "Bağlanıldı: " + roomCode;
-        roomInfoDisplay.style.display = 'block';
-
-        // Host'un hesapladığı anlık konum verilerini dinle (Sadece ekrana çizeceğiz)
-        onValue(ref(db, 'rooms/' + roomCode + '/state'), (snapshot) => {
+        get(ref(db, 'rooms/' + code + '/info')).then((snapshot) => {
             if (snapshot.exists()) {
-                players = snapshot.val();
-            } else {
-                alert("Oyun bitti veya oda kapatıldı.");
-                window.location.reload();
-            }
-        });
+                let info = snapshot.val();
+                if (info.joined < info.max && !info.ready) {
+                    // Odaya gir
+                    role = 'client';
+                    roomCode = code;
+                    myId = info.joined + 1; // 2., 3. veya 4. oyuncu
+                    
+                    set(ref(db, 'rooms/' + roomCode + '/info/joined'), myId);
+                    mpMenu.style.display = 'none';
+                    waitingScreen.style.display = 'flex';
+                    document.getElementById('waitingCode').innerText = "KOD: " + roomCode;
+                    document.getElementById('waitingCount').innerText = "Bağlanıldı, Kurucu Bekleniyor...";
+                    
+                    // Host'un "Başla" komutunu dinle
+                    onValue(ref(db, 'rooms/' + roomCode + '/info/ready'), (snap) => {
+                        if (snap.exists() && snap.val() === true && !gameStarted) {
+                            waitingScreen.style.display = 'none';
+                            roomInfoDisplay.innerText = "Oda: " + roomCode;
+                            roomInfoDisplay.style.display = 'block';
+                            gameStarted = true;
+                            gameLoop();
+                        }
+                    });
 
-        gameLoop();
-    } else {
-        alert("Lütfen 4 haneli oda kodunu girin.");
-    }
+                    // Konumları canlı oku (Mobil Görünmeme Sorununun Çözümü: Object.values)
+                    onValue(ref(db, 'rooms/' + roomCode + '/state'), (snap) => {
+                        if (snap.exists()) {
+                            players = Object.values(snap.val()); // Firebase objesini güvenle diziye çevirir
+                        } else if(gameStarted) {
+                            alert("Kurucu oyundan çıktı.");
+                            window.location.reload();
+                        }
+                    });
+
+                } else { alert("Oda tam dolu veya oyun çoktan başladı!"); }
+            } else { alert("Geçersiz Oda Kodu!"); }
+        });
+    } else { alert("Lütfen 4 haneli kodu girin."); }
 };
 
-// Çarpışma Fiziği (Sadece Host çalıştırır)
-function resolveCollision(p1, p2) {
-    let dx = p2.x - p1.x;
-    let dy = p2.y - p1.y;
-    let distance = Math.hypot(dx, dy);
-    let minDist = p1.radius + p2.radius;
+// === KARAKTER KURULUMU ===
+function initPlayersSetup(playerCount) {
+    players = [];
+    
+    // Sen (1. Oyuncu) Her zaman varsın
+    players.push({ id: 1, name: '1. Oyuncu', x: arena.x, y: arena.y - 100, radius: 25, color: '#0ea5e9', emoji: '😎', vx: 0, vy: 0, speed: 0.6, friction: 0.95, isBot: false, isDead: false });
 
+    if (playerCount === 1) {
+        // Tek kişiyse 3 bot ekle
+        players.push({ id: 2, name: 'Kırmızı Bot', x: arena.x, y: arena.y + 100, radius: 25, color: '#ef4444', emoji: '🤖', vx: 0, vy: 0, speed: 0.22, friction: 0.95, isBot: true, isDead: false });
+        players.push({ id: 3, name: 'Yeşil Bot', x: arena.x - 100, y: arena.y, radius: 25, color: '#10b981', emoji: '🤖', vx: 0, vy: 0, speed: 0.25, friction: 0.95, isBot: true, isDead: false });
+        players.push({ id: 4, name: 'Sarı Bot', x: arena.x + 100, y: arena.y, radius: 25, color: '#f59e0b', emoji: '🤖', vx: 0, vy: 0, speed: 0.2, friction: 0.95, isBot: true, isDead: false });
+    } else {
+        // Çok Oyunculu: Seçilen sayı kadar GERÇEK insan ekle, Bot YOK.
+        if(playerCount >= 2) players.push({ id: 2, name: '2. Oyuncu', x: arena.x, y: arena.y + 100, radius: 25, color: '#ef4444', emoji: '😈', vx: 0, vy: 0, speed: 0.6, friction: 0.95, isBot: false, isDead: false });
+        if(playerCount >= 3) players.push({ id: 3, name: '3. Oyuncu', x: arena.x - 100, y: arena.y, radius: 25, color: '#10b981', emoji: '👽', vx: 0, vy: 0, speed: 0.6, friction: 0.95, isBot: false, isDead: false });
+        if(playerCount === 4) players.push({ id: 4, name: '4. Oyuncu', x: arena.x + 100, y: arena.y, radius: 25, color: '#f59e0b', emoji: '🥶', vx: 0, vy: 0, speed: 0.6, friction: 0.95, isBot: false, isDead: false });
+    }
+}
+
+// === FİZİK VE OYUN DÖNGÜSÜ ===
+function resolveCollision(p1, p2) {
+    let dx = p2.x - p1.x; let dy = p2.y - p1.y;
+    let distance = Math.hypot(dx, dy); let minDist = p1.radius + p2.radius;
     if (distance < minDist) {
         let angle = Math.atan2(dy, dx);
         let force = 3.5; 
         let overlap = minDist - distance;
         
-        p1.x -= Math.cos(angle) * (overlap / 2);
-        p1.y -= Math.sin(angle) * (overlap / 2);
-        p2.x += Math.cos(angle) * (overlap / 2);
-        p2.y += Math.sin(angle) * (overlap / 2);
-
-        p1.vx -= Math.cos(angle) * force;
-        p1.vy -= Math.sin(angle) * force;
-        p2.vx += Math.cos(angle) * force;
-        p2.vy += Math.sin(angle) * force;
+        p1.x -= Math.cos(angle) * (overlap / 2); p1.y -= Math.sin(angle) * (overlap / 2);
+        p2.x += Math.cos(angle) * (overlap / 2); p2.y += Math.sin(angle) * (overlap / 2);
+        p1.vx -= Math.cos(angle) * force; p1.vy -= Math.sin(angle) * force;
+        p2.vx += Math.cos(angle) * force; p2.vy += Math.sin(angle) * force;
     }
 }
 
-function getNearestTarget(bot) {
-    let nearest = null;
-    let minDistance = Infinity;
-    players.forEach(p => {
-        if (p !== bot && !p.isDead) {
-            let dist = Math.hypot(p.x - bot.x, p.y - bot.y);
-            if (dist < minDistance) { minDistance = dist; nearest = p; }
-        }
-    });
-    return nearest;
-}
-
-// === OYUN DÖNGÜSÜ ===
 function update() {
-    if (gameOver) return;
+    if (gameOver || !gameStarted) return;
 
     if (role === 'host') {
-        // --- 1. Oyuncu (Host/Sen) Hareketi ---
-        let p1 = players[0];
-        if (!p1.isDead) {
-            if (keys['ArrowUp'] || keys['w']) p1.vy -= p1.speed;
-            if (keys['ArrowDown'] || keys['s']) p1.vy += p1.speed;
-            if (keys['ArrowLeft'] || keys['a']) p1.vx -= p1.speed;
-            if (keys['ArrowRight'] || keys['d']) p1.vx += p1.speed;
-            p1.vx += joystickData.x * 0.8;
-            p1.vy += joystickData.y * 0.8;
-        }
-
-        // --- 2. Oyuncu (Client/Oğlun) Hareketi ---
-        // Eğer bağlanmışsa, telefondan gelen veriyi kırmızı karaktere uygula
-        let p2 = players[1];
-        if (!p2.isBot && !p2.isDead) {
-            p2.vx += p2RemoteInput.x * 0.8;
-            p2.vy += p2RemoteInput.y * 0.8;
-        }
-
-        // --- Bot ve Ortak Hareketler ---
         players.forEach(p => {
-            if (p.isBot && !p.isDead) {
-                let target = getNearestTarget(p);
-                if (target) {
-                    let angle = Math.atan2(target.y - p.y, target.x - p.x);
-                    p.vx += Math.cos(angle) * p.speed;
-                    p.vy += Math.sin(angle) * p.speed;
+            if (p.isDead) return;
+
+            if (!p.isBot) {
+                // İnsan Oyuncular
+                if (p.id === 1) { // Host Kontrolü
+                    if (keys['ArrowUp'] || keys['w']) p.vy -= p.speed;
+                    if (keys['ArrowDown'] || keys['s']) p.vy += p.speed;
+                    if (keys['ArrowLeft'] || keys['a']) p.vx -= p.speed;
+                    if (keys['ArrowRight'] || keys['d']) p.vx += p.speed;
+                    p.vx += joystickData.x * 0.8; p.vy += joystickData.y * 0.8;
+                } else { // Client Kontrolleri (Uzaktan Gelen)
+                    if (remoteInputs[p.id]) {
+                        p.vx += remoteInputs[p.id].x * 0.8;
+                        p.vy += remoteInputs[p.id].y * 0.8;
+                    }
+                }
+            } else {
+                // Sadece Tek Oyunculu Moddaki Bot Mantığı
+                let nearest = null; let minDistance = Infinity;
+                players.forEach(target => {
+                    if (target !== p && !target.isDead) {
+                        let dist = Math.hypot(target.x - p.x, target.y - p.y);
+                        if (dist < minDistance) { minDistance = dist; nearest = target; }
+                    }
+                });
+                if (nearest) {
+                    let angle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+                    p.vx += Math.cos(angle) * p.speed; p.vy += Math.sin(angle) * p.speed;
                 }
             }
 
-            p.vx *= p.friction;
-            p.vy *= p.friction;
-            p.x += p.vx;
-            p.y += p.vy;
+            p.vx *= p.friction; p.vy *= p.friction;
+            p.x += p.vx; p.y += p.vy;
 
-            // Arenadan düşme
-            if (Math.hypot(p.x - arena.x, p.y - arena.y) > arena.radius && !p.isDead) {
-                p.isDead = true;
-            }
+            if (Math.hypot(p.x - arena.x, p.y - arena.y) > arena.radius && !p.isDead) p.isDead = true;
         });
 
-        // Çarpışmalar
         for (let i = 0; i < players.length; i++) {
             for (let j = i + 1; j < players.length; j++) {
-                if (!players[i].isDead && !players[j].isDead) {
-                    resolveCollision(players[i], players[j]);
-                }
+                if (!players[i].isDead && !players[j].isDead) resolveCollision(players[i], players[j]);
             }
         }
 
-        // Host yeni konumları Firebase'e yazar (60fps)
-        set(ref(db, 'rooms/' + roomCode + '/state'), players);
+        if (maxPlayers > 1) {
+            set(ref(db, 'rooms/' + roomCode + '/state'), players);
+        }
         
-        // Oyun Bitti Kontrolü
+        // Oyun Bitti Mi?
         let alivePlayers = players.filter(p => !p.isDead);
         if (alivePlayers.length <= 1) {
             gameOver = true;
             overlay.style.display = 'flex';
-            if (alivePlayers.length === 1) {
-                winnerText.innerText = `🏆 ${alivePlayers[0].name} Kazandı!`;
-            } else {
-                winnerText.innerText = "🤝 Berabere!";
-            }
+            if (alivePlayers.length === 1) winnerText.innerText = `🏆 ${alivePlayers[0].name} Kazandı!`;
+            else winnerText.innerText = "🤝 Berabere!";
         }
 
     } else if (role === 'client') {
-        // Client (Telefondan katılan) sadece kendi joystick hareketini Firebase'e gönderir.
-        // Fizik hesaplamaz, ekrana çizmeyi onValue() ile yapar.
-        set(ref(db, 'rooms/' + roomCode + '/p2Input'), joystickData);
+        // Sadece joystick verisini kendi ID numarasına gönder
+        set(ref(db, 'rooms/' + roomCode + '/inputs/' + myId), joystickData);
     }
 }
 
 function draw() {
+    if(!gameStarted) return; // Oyun başlamadıysa çizme
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.beginPath();
     ctx.arc(arena.x, arena.y, arena.radius, 0, Math.PI * 2);
-    ctx.fillStyle = arena.color;
-    ctx.fill();
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = arena.borderColor;
-    ctx.stroke();
+    ctx.fillStyle = arena.color; ctx.fill();
+    ctx.lineWidth = 5; ctx.strokeStyle = arena.borderColor; ctx.stroke();
 
     players.forEach(p => {
         if (!p.isDead) {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = p.color;
-            ctx.fill();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#ffffff';
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = p.color; ctx.fill();
+            ctx.lineWidth = 3; ctx.strokeStyle = '#ffffff'; ctx.stroke();
 
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '24px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff'; ctx.font = '24px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(p.emoji, p.x, p.y);
         }
     });
@@ -269,5 +304,5 @@ function draw() {
 function gameLoop() {
     update();
     draw();
-    requestAnimationFrame(gameLoop);
+    if(gameStarted) requestAnimationFrame(gameLoop);
 }
