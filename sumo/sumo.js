@@ -42,7 +42,7 @@ window.addEventListener('keyup', (e) => keys[e.key] = false);
 
 let joystickData = { x: 0, y: 0 };
 const manager = nipplejs.create({
-    zone: document.body,
+    zone: document.getElementById('joystick-zone'), // document.body yerine özel divi seçtik
     mode: 'dynamic',
     color: '#38bdf8',
     size: 150
