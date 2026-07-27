@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Çok Oyunculu Oyun Arenası</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Oyun Arenası</h1>
+            <p>Oynamak istediğin oyunu seç, aileni ve arkadaşlarını davet et!</p>
+        </header>
+
+        <div class="game-grid">
+            <!-- Sumo Arenası Kartı (Aktif) -->
+            <div class="game-card">
+                <h2>Sumo Arenası</h2>
+                <p>Rakiplerini platformdan aşağı it, arenada kalan son kişi sen ol!</p>
+                <div class="card-actions">
+                    <!-- Tıklandığında sumo klasöründeki oyuna yönlendirecek -->
+                    <button class="btn-primary" onclick="window.location.href='sumo/sumo.html'">Oda Kur</button>
+                    <button class="btn-secondary">Odaya Katıl</button>
+                </div>
+            </div>
+
+            <!-- Tank Savaşı Kartı (Yapım Aşamasında) -->
+            <div class="game-card disabled">
+                <h2>Tank Savaşı</h2>
+                <p>Labirentte sekerek ilerleyen mermilerle rakiplerini alt et.</p>
+                <div class="card-actions">
+                    <button class="btn-disabled" disabled>Yakında</button>
+                </div>
+            </div>
+
+            <!-- Patlatmaca Kartı (Yapım Aşamasında) -->
+            <div class="game-card disabled">
+                <h2>Patlatmaca</h2>
+                <p>Duvarları yık, bombaları stratejik yerleştir ve haritayı ele geçir.</p>
+                <div class="card-actions">
+                    <button class="btn-disabled" disabled>Yakında</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
