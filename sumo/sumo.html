@@ -15,111 +15,51 @@
             height: 100vh;
             font-family: sans-serif;
         }
-        canvas {
-            background-color: #1e293b;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            z-index: 1; 
-        }
-        #joystick-zone {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 5; 
-        }
+        canvas { background-color: #1e293b; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); z-index: 1; }
+        #joystick-zone { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
+        
         .geri-don {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            padding: 10px 15px;
-            background-color: #334155;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            cursor: pointer;
-            z-index: 999;
-            pointer-events: auto;
-            transition: background-color 0.2s;
+            position: absolute; top: 20px; left: 20px; padding: 10px 15px;
+            background-color: #334155; color: white; border: none; border-radius: 8px;
+            font-weight: bold; font-size: 0.9rem; cursor: pointer; z-index: 999;
+            pointer-events: auto; transition: background-color 0.2s;
         }
         .geri-don:hover { background-color: #475569; }
 
-        /* Oda Bilgisi (Oyun sırasında üstte görünür) */
         #roomInfoDisplay {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background-color: #0ea5e9;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 1.2rem;
-            z-index: 999;
-            display: none;
+            position: absolute; top: 20px; right: 20px; background-color: #0ea5e9;
+            color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold;
+            font-size: 1.2rem; z-index: 999; display: none;
         }
 
-        /* Multiplayer Bağlantı Menüsü */
-        #mpMenu {
-            position: absolute;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: rgba(15, 23, 42, 0.95);
-            padding: 40px;
-            border-radius: 16px;
-            border: 2px solid #38bdf8;
-            color: white;
-            z-index: 999;
-            gap: 15px;
+        /* Menü ve Lobi Ekranları */
+        .overlay-menu {
+            position: absolute; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; background: rgba(15, 23, 42, 0.95); padding: 40px;
+            border-radius: 16px; border: 2px solid #38bdf8; color: white; z-index: 999; gap: 15px; text-align: center;
         }
-        #mpMenu h2 { margin-bottom: 10px; color: #38bdf8; }
+        .overlay-menu h2 { margin-bottom: 10px; color: #38bdf8; font-size: 1.8rem; }
+        
         .mp-btn {
-            width: 100%;
-            padding: 12px 24px;
-            background-color: #0ea5e9;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            pointer-events: auto;
+            width: 100%; padding: 12px 24px; background-color: #0ea5e9; color: white;
+            border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; pointer-events: auto;
         }
         .mp-btn:hover { background-color: #0284c7; }
+        .btn-cancel { background-color: #ef4444 !important; margin-top: 10px; }
+        .btn-cancel:hover { background-color: #b91c1c !important; }
+        
         .mp-input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 2px solid #334155;
-            background-color: #1e293b;
-            color: white;
-            font-size: 1.1rem;
-            text-align: center;
-            text-transform: uppercase;
+            width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #334155;
+            background-color: #1e293b; color: white; font-size: 1.1rem; text-align: center; text-transform: uppercase;
         }
         .divider { width: 100%; height: 2px; background-color: #334155; margin: 10px 0; }
 
         /* Oyun Bitti Arayüzü */
-        #gameOverlay {
-            display: none; 
-            position: absolute;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: rgba(15, 23, 42, 0.85);
-            padding: 30px 50px;
-            border-radius: 16px;
-            border: 2px solid #38bdf8;
-            color: white;
-            text-align: center;
-            z-index: 999;
-        }
-        #gameOverlay h2 { font-size: 2rem; margin-bottom: 10px; }
+        #gameOverlay { display: none; }
         #gameOverlay p { font-size: 1.2rem; margin-bottom: 20px; color: #94a3b8; }
+        
+        /* Ekran Katmanları */
+        #hostSetup, #waitingScreen { display: none; }
     </style>
 </head>
 <body>
@@ -127,26 +67,42 @@
     <button class="geri-don" onclick="window.location.href='../index.html'">⬅ Menüye Dön</button>
     <div id="roomInfoDisplay"></div>
     
-    <!-- Bağlantı Menüsü -->
-    <div id="mpMenu">
+    <!-- Ana Bağlantı Menüsü -->
+    <div id="mpMenu" class="overlay-menu">
         <h2>Oyun Modu Seç</h2>
-        <button id="btnHost" class="mp-btn">🏠 Oda Kur (Host)</button>
+        <button id="btnHostInit" class="mp-btn">🏠 Oda Kur (Host)</button>
         <div class="divider"></div>
         <input type="text" id="joinCodeInput" class="mp-input" placeholder="4 Haneli Oda Kodu" maxlength="4">
         <button id="btnJoin" class="mp-btn" style="background-color: #10b981;">🤝 Odaya Katıl</button>
     </div>
 
+    <!-- Oda Kurulumu (Kişi Sayısı Seçimi) -->
+    <div id="hostSetup" class="overlay-menu">
+        <h2>Kaç Kişilik?</h2>
+        <button class="mp-btn btn-player-count" data-count="1">1 Kişi (Botlara Karşı)</button>
+        <button class="mp-btn btn-player-count" data-count="2">2 Kişi</button>
+        <button class="mp-btn btn-player-count" data-count="3">3 Kişi</button>
+        <button class="mp-btn btn-player-count" data-count="4">4 Kişi</button>
+        <button id="btnCancelHost" class="mp-btn btn-cancel">İptal</button>
+    </div>
+
+    <!-- Lobi / Bekleme Ekranı -->
+    <div id="waitingScreen" class="overlay-menu">
+        <h2>Oyuncular Bekleniyor...</h2>
+        <h1 id="waitingCode" style="color: #f59e0b; margin: 10px 0; font-size: 2.5rem;"></h1>
+        <p id="waitingCount" style="font-size: 1.2rem; color: #94a3b8;">1 / 4</p>
+    </div>
+
     <!-- Oyun Sonu Ekranı -->
-    <div id="gameOverlay">
+    <div id="gameOverlay" class="overlay-menu">
         <h2 id="winnerText">Oyun Bitti</h2>
         <p id="winnerSubText"></p>
-        <button id="restartBtn" class="mp-btn" onclick="window.location.reload()">Tekrar Oyna</button>
+        <button class="mp-btn" onclick="window.location.reload()">Tekrar Oyna / Çık</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
-    <!-- NOT: type="module" eklendi -->
     <script type="module" src="sumo.js"></script>
 </body>
 </html>
