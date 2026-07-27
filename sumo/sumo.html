@@ -7,13 +7,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            background-color: #0f172a; 
-            overflow: hidden; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: sans-serif;
+            background-color: #0f172a; overflow: hidden; display: flex;
+            justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;
         }
         canvas { background-color: #1e293b; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); z-index: 1; }
         #joystick-zone { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
@@ -32,7 +27,6 @@
             font-size: 1.2rem; z-index: 999; display: none;
         }
 
-        /* Menü ve Lobi Ekranları */
         .overlay-menu {
             position: absolute; display: flex; flex-direction: column; align-items: center;
             justify-content: center; background: rgba(15, 23, 42, 0.95); padding: 40px;
@@ -54,11 +48,8 @@
         }
         .divider { width: 100%; height: 2px; background-color: #334155; margin: 10px 0; }
 
-        /* Oyun Bitti Arayüzü */
         #gameOverlay { display: none; }
         #gameOverlay p { font-size: 1.2rem; margin-bottom: 20px; color: #94a3b8; }
-        
-        /* Ekran Katmanları */
         #hostSetup, #waitingScreen { display: none; }
     </style>
 </head>
@@ -67,7 +58,6 @@
     <button class="geri-don" onclick="window.location.href='../index.html'">⬅ Menüye Dön</button>
     <div id="roomInfoDisplay"></div>
     
-    <!-- Ana Bağlantı Menüsü -->
     <div id="mpMenu" class="overlay-menu">
         <h2>Oyun Modu Seç</h2>
         <button id="btnHostInit" class="mp-btn">🏠 Oda Kur (Host)</button>
@@ -76,7 +66,6 @@
         <button id="btnJoin" class="mp-btn" style="background-color: #10b981;">🤝 Odaya Katıl</button>
     </div>
 
-    <!-- Oda Kurulumu (Kişi Sayısı Seçimi) -->
     <div id="hostSetup" class="overlay-menu">
         <h2>Kaç Kişilik?</h2>
         <button class="mp-btn btn-player-count" data-count="1">1 Kişi (Botlara Karşı)</button>
@@ -86,18 +75,19 @@
         <button id="btnCancelHost" class="mp-btn btn-cancel">İptal</button>
     </div>
 
-    <!-- Lobi / Bekleme Ekranı -->
     <div id="waitingScreen" class="overlay-menu">
         <h2>Oyuncular Bekleniyor...</h2>
         <h1 id="waitingCode" style="color: #f59e0b; margin: 10px 0; font-size: 2.5rem;"></h1>
         <p id="waitingCount" style="font-size: 1.2rem; color: #94a3b8;">1 / 4</p>
     </div>
 
-    <!-- Oyun Sonu Ekranı -->
+    <!-- OYUN SONU EKRANI GÜNCELLENDİ -->
     <div id="gameOverlay" class="overlay-menu">
         <h2 id="winnerText">Oyun Bitti</h2>
         <p id="winnerSubText"></p>
-        <button class="mp-btn" onclick="window.location.reload()">Tekrar Oyna / Çık</button>
+        <button id="btnRestartRound" class="mp-btn">Tekrar Oyna (Aynı Oda)</button>
+        <p id="waitingHostText" style="color: #f59e0b; display: none;">Kurucunun yeniden başlatması bekleniyor...</p>
+        <button class="mp-btn btn-cancel" onclick="window.location.reload()">Odadan Çık</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
