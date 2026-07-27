@@ -269,10 +269,18 @@ function update() {
         }
 
     } else if (role === 'client') {
+        // YENİ EKLENEN KISIM: KLAVYE VE JOYSTICK VERİSİNİ BİRLEŞTİRİYORUZ
+        let clientInputX = joystickData.x;
+        let clientInputY = joystickData.y;
+
+        if (keys['ArrowLeft'] || keys['a']) clientInputX -= 1;
+        if (keys['ArrowRight'] || keys['d']) clientInputX += 1;
+        if (keys['ArrowUp'] || keys['w']) clientInputY -= 1;
+        if (keys['ArrowDown'] || keys['s']) clientInputY += 1;
         if (now - lastClientWrite > SYNC_RATE) {
-            if (lastSentJoystick.x !== joystickData.x || lastSentJoystick.y !== joystickData.y) {
-                set(ref(db, 'rooms/' + roomCode + '/inputs/' + myId), joystickData);
-                lastSentJoystick = { x: joystickData.x, y: joystickData.y };
+            if (lastSentJoystick.x !== clientInputX || lastSentJoystick.y !== clientInputY) {
+                set(ref(db, 'rooms/' + roomCode + '/inputs/' + myId), { x: clientInputX, y: clientInputY });
+                lastSentJoystick = { x: clientInputX, y: clientInputY };
                 lastClientWrite = now;
             }
         }
